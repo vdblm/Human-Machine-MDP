@@ -10,6 +10,7 @@ class Agent:
     """
 
     def __init__(self):
+        self.policy = {}
         pass
 
     def update_obs(self, *args):
@@ -62,9 +63,9 @@ class FiniteHorizonSwitchingAgent(Agent):
         """
         :param env: The environment object
         :type env: environment.EpisodicMDP
-        :param agent0_prior: The prior action policy for the first agent, like machine.
+        :param agent0_prior: The prior of the first agent, like machine.
         :type agent0_prior: Belief
-        :param agent1_prior:The prior action policy for the second agent, like human.
+        :param agent1_prior:The prior of the second agent, like human.
         :type agent1_prior: Belief
         :param cost_prior: The prior belief based on the costs.
         :type cost_prior: Belief
@@ -88,11 +89,13 @@ class FiniteHorizonSwitchingAgent(Agent):
 
         # initialize the switching policy. dictionary {(time_step, prev_agent, state):agent1_prob}
         # for time_step = 0, prev_agent = -1!
-        self.switching_policy = {}
         for t in range(env.ep_l):
             for state in range(env.n_states):
-                for prev_agent in [0, 1]:
-                    self.switching_policy[t, state, prev_agent] = 1
+                if t == 0:
+                    self.policy[t, state, -1] = 1
+                else:
+                    for prev_agent in [0, 1]:
+                        self.policy[t, state, prev_agent] = 1
 
         # initialize the agent0, agent1, costs and transition probs
         self.agents = [self.agents_prior[0].sample(), self.agents_prior[1].sample()]
@@ -101,7 +104,7 @@ class FiniteHorizonSwitchingAgent(Agent):
 
     def take_action(self, state, prev_agent, time_step):
         """chooses the controller of the current state"""
-        agent0_prob = self.switching_policy[time_step, state, prev_agent]
+        agent0_prob = self.policy[time_step, state, prev_agent]
         self.cur_agent = np.random.choice([0, 1], p=[agent0_prob, 1 - agent0_prob])
         return self.cur_agent
 
@@ -109,7 +112,7 @@ class FiniteHorizonSwitchingAgent(Agent):
         """ update the posterior beliefs"""
 
         # update agents_prior
-        self.agents_prior[prev_state].update(prev_state, action)
+        self.agents_prior[prev_agent].update(prev_state, action)
 
         # update cost_prior
         self.cost_prior.update(prev_state, action, cost)
@@ -144,29 +147,83 @@ class ExactPSRL(FiniteHorizonSwitchingAgent):
                 g = 0
                 f = 0
                 for a in range(self.env.n_actions):
-                    g += machine.action_policy[s][a] * (
-                            self.costs[s, a] + int(t != self.env.ep_l - 1) * np.dot(value[t + 1, 0],
-                                                                                    self.transition_prob[s, a]))
-                    f += human.action_policy[s][a] * (
-                            self.costs[s, a] + int(t != self.env.ep_l - 1) * np.dot(value[t + 1, 1],
-                                                                                    self.transition_prob[s, a]))
+                    if t < self.env.ep_l - 1:
+                        g_exp = np.dot(value[t + 1, 0],
+                                       self.transition_prob[s, a])
+                        f_exp = np.dot(value[t + 1, 1],
+                                       self.transition_prob[s, a])
+                    else:
+                        g_exp = 0
+                        f_exp = 0
+                    g += machine.policy[s][a] * (
+                            self.costs[s, a] + g_exp)
+                    f += human.policy[s][a] * (
+                            self.costs[s, a] + f_exp)
 
                 if t > 0:
                     for d in [0, 1]:
                         left = self.switching_cost * int(d == 1) + g
                         right = self.human_cost + self.switching_cost * int(d == 0) + f
                         if left <= right:
-                            self.switching_policy[t, s, d] = 1
+                            self.policy[t, s, d] = 1
                             value[t, d][s] = left
                         else:
-                            self.switching_policy[t, s, d] = 0
+                            self.policy[t, s, d] = 0
                             value[t, d][s] = right
                 else:
                     left = g
                     right = self.human_cost + f
                     if left <= right:
-                        self.switching_policy[t, s, -1] = 1
+                        self.policy[t, s, -1] = 1
                         value[t][s] = left
                     else:
-                        self.switching_policy[t, s, -1] = 0
+                        self.policy[t, s, -1] = 0
                         value[t][s] = right
+
+
+class ChessboardHumanAgent(Agent):
+    def __init__(self, env):
+        """
+
+        :param env: a chessboard environment
+        :type env: environment.EpisodicMDP
+        """
+        super().__init__()
+        self.env = env
+
+        l = np.sqrt(self.env.n_states)
+        for s in range(self.env.n_states):
+            self.policy[s] = np.zeros(self.env.n_actions)
+            if s >= l * (l - 1):
+                # there's a wall on the upside, goes right (action = 3)
+                self.policy[s][3] = 1
+            else:
+                # goes up (action = 0)
+                self.policy[s][0] = 1
+
+    def take_action(self, curr_state):
+        return np.random.choice(range(self.env.n_actions), p=self.policy[curr_state])
+
+
+class ChessboardMachineAgent(Agent):
+    def __init__(self, env):
+        """
+
+        :param env: a chessboard environment
+        :type env: environment.EpisodicMDP
+        """
+        super().__init__()
+        self.env = env
+
+        l = np.sqrt(self.env.n_states)
+        for s in range(self.env.n_states):
+            self.policy[s] = np.zeros(self.env.n_actions)
+            if (s + 1) % l == 0:
+                # there's a wall on the right side, goes up (action = 0)
+                self.policy[s][0] = 1
+            else:
+                # goes right (action = 3)
+                self.policy[s][3] = 1
+
+    def take_action(self, curr_state):
+        return np.random.choice(range(self.env.n_actions), p=self.policy[curr_state])
