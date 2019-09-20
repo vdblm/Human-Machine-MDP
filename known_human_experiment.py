@@ -26,7 +26,7 @@ def run_known_human_exp(switching_cost, human_cost):
     switching_agent.update_policy()
     curr_agent = -1
     curr_state = chessboard.state
-    print("Episode starts\n time: (current state, current controller, action) --> (new state) ")
+    print("Episode starts\n time: (current state, current controller, action) --> (new state, cost) ")
     while not finished:
         prev_agent = curr_agent
         prev_state = curr_state
@@ -39,8 +39,8 @@ def run_known_human_exp(switching_cost, human_cost):
 
         curr_state, cost, finished = chessboard.step_forward(action)
         switching_agent.update_obs(prev_state, curr_agent, action, cost, curr_state, finished)
-        print("{} ({}, {}, {}) --> ({})".format(chessboard.time_step - 1, prev_state, curr_agent, action, curr_state))
+        print("{} ({}, {}, {}) --> ({}, {})".format(chessboard.time_step - 1, prev_state, curr_agent, action, curr_state, cost))
 
 
 if __name__ == '__main__':
-    run_known_human_exp(0, 0)
+    run_known_human_exp(0.025, 0.04)

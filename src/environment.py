@@ -86,7 +86,7 @@ def make_chessboard(length=5, ep_l=15, eps=0.1, trans_prob=0.8):
         x_n = x + int(a >= 2) * (2 * a - 5)
         s_n = length * y_n + x_n
         # if the next cell is wall
-        if s_n >= length * length or s_n < 0:
+        if x_n >= length or x_n < 0 or y_n >= length or y_n < 0:
             s_n = s
         return s_n
 
@@ -115,7 +115,7 @@ def make_chessboard(length=5, ep_l=15, eps=0.1, trans_prob=0.8):
                 transition_true[s, a] = np.divide(transition_true[s, a], sum(transition_true[s, a]))
     # goal cost
     for a in range(n_actions):
-        cost_true[length * 2 - 1, a] = 0
+        cost_true[length * length - 1, a] = 0
 
     chessboard = EpisodicMDP(n_states, n_actions, ep_l, cost_true, transition_true)
     return chessboard, cost_true, transition_true

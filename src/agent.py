@@ -141,7 +141,7 @@ class ExactPSRL(FiniteHorizonSwitchingAgent):
                     value[t, d] = np.zeros(self.env.n_states, dtype=np.float)
 
         # dynamic programming
-        for t in range(self.env.ep_l - 1, 0, -1):
+        for t in range(self.env.ep_l - 1, -1, -1):
             for s in range(self.env.n_states):
                 # d = 1 is for human and d = 0 for machine
                 g = 0
