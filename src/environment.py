@@ -5,6 +5,8 @@ states, actions, costs, transition probabilities, and episode length.
 author: balazadehvahid@gmail.com
 """
 import numpy as np
+from matplotlib import collections as mc
+import pylab as pl
 
 
 class EpisodicMDP:
@@ -60,7 +62,7 @@ class EpisodicMDP:
         return self.state, cost, finished
 
 
-def make_chessboard(length=5, ep_l=15, eps=0.1, trans_prob=0.8):
+def make_chessboard(length=5, ep_l=15, eps=0.1, trans_prob=.8):
     """
     Chessboard example in the paper
     :param length: Number of cells = length * length
@@ -106,11 +108,15 @@ def make_chessboard(length=5, ep_l=15, eps=0.1, trans_prob=0.8):
             for a in range(n_actions):
                 transition_true[s, a] = np.zeros(n_states, dtype=np.float)
                 s_n = next_state(x, y, a)
-                transition_true[s, a][s_n] = trans_prob
-                for a2 in range(n_actions):
-                    if a2 != a:
-                        s_n = next_state(x, y, a2)
-                        transition_true[s, a][s_n] = (1 - trans_prob) / (n_actions - 1)
+                # transition in the goal state
+                if s == length * length - 1:
+                    transition_true[s, a][s_n] = 1
+                else:
+                    transition_true[s, a][s_n] = trans_prob
+                    for a2 in range(n_actions):
+                        if a2 != a:
+                            s_n = next_state(x, y, a2)
+                            transition_true[s, a][s_n] = (1 - trans_prob) / (n_actions - 1)
                 # normalize probs
                 transition_true[s, a] = np.divide(transition_true[s, a], sum(transition_true[s, a]))
     # goal cost
@@ -119,3 +125,56 @@ def make_chessboard(length=5, ep_l=15, eps=0.1, trans_prob=0.8):
 
     chessboard = EpisodicMDP(n_states, n_actions, ep_l, cost_true, transition_true)
     return chessboard, cost_true, transition_true
+
+
+class PlotPath:
+    """
+    plot agent path in the chessboard experiment
+    """
+
+    def __init__(self, episodes, length=5):
+        """
+
+        :param length: number of cells = length * length
+        :type length: int
+        """
+        self.length = length
+        self.episode = episodes
+
+        # lines {(org_long, org_lat, dest_long, dest_lat, color): count}
+        self.lines = {}
+
+    def add_line(self, org_state, dest_state, color):
+        """
+        adds line to the plot
+        :type org_state: int
+        :type dest_state: int
+        """
+        org_y = int(org_state / self.length)
+        org_x = org_state % self.length
+        dest_y = int(dest_state / self.length)
+        dest_x = dest_state % self.length
+        line_count = self.lines.get((org_x, org_y, dest_x, dest_y, color))
+        if line_count is None:
+            line_count = 1
+        else:
+            line_count += 1
+        self.lines[(org_x, org_y, dest_x, dest_y, color)] = line_count
+
+    def plot(self):
+        lines = []
+        colors = []
+        width = []
+        for line_tuple in self.lines:
+            line = [(line_tuple[0] + 0.5, line_tuple[1] + 0.5), (line_tuple[2] + 0.5, line_tuple[3] + 0.5)]
+            lines.append(line)
+            colors.append(line_tuple[4])
+            width.append(self.lines.get(line_tuple))
+        width = np.divide(width, self.episode/5)
+        lc = mc.LineCollection(lines, colors=colors, linewidths=width)
+        fig, ax = pl.subplots()
+        ax.add_collection(lc)
+        ax.autoscale()
+        ax.margins(0.1)
+        pl.grid(True)
+        return pl, fig
