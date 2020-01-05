@@ -1,7 +1,7 @@
 from collections import defaultdict
 import numpy as np
 import pylab as pl
-from src.environments.lane_keeping import make_default_cell_types
+from environments.lane_keeping import make_default_cell_types
 
 
 class PlotPath:
