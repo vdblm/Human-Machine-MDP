@@ -9,7 +9,7 @@ def __in_range(i, ranges):
     return False
 
 
-def make_default_cell_types(width, height):
+def make_default_lane_keeping_cell_types(width, height):
     cell_types = {}
     # cell_types default value
     if cell_types is None:
@@ -37,7 +37,7 @@ def make_default_cell_types(width, height):
     return cell_types
 
 
-def make_lane_keeping(width, height, costs, cell_types=None, start_cell=None):
+def make_lane_keeping(width, height, costs, cell_types, start_cell=None):
     """
     lane keeping example in the paper. each cell is a 'road', 'grass', 'stone', or 'end'.
     TODO it's a deterministic env now, we may add some noise to transition probs
@@ -50,7 +50,7 @@ def make_lane_keeping(width, height, costs, cell_types=None, start_cell=None):
     :param start_cell: (x, y) coordinate of the starting cell
     :type start_cell: tuple
 
-    episode length is `height`.
+    episode length is `height` - 1.
 
     """
 
@@ -59,10 +59,8 @@ def make_lane_keeping(width, height, costs, cell_types=None, start_cell=None):
     # actions = [left turn, keep straight, right turn]
     n_actions = 3
     n_states = width * height
-    ep_l = height
+    ep_l = height - 1
 
-    if cell_types is None:
-        cell_types = make_default_cell_types(width, height)
     if start_cell is None:
         start_cell = (np.math.ceil(2 * width / 7), 0)
 

@@ -1,7 +1,8 @@
 from collections import defaultdict
 import numpy as np
 import pylab as pl
-from environments.lane_keeping import make_default_cell_types
+from matplotlib import collections as mc
+from environments.lane_keeping import make_default_lane_keeping_cell_types
 
 
 class PlotPath:
@@ -42,7 +43,7 @@ class PlotPath:
 
         self.lines[(src_x, src_y, dst_x, dst_y, color)] += 1
 
-    def plot(self):
+    def plot(self, arrow_plot=True):
         lines = []
         colors = []
         width = []
@@ -65,23 +66,26 @@ class PlotPath:
                     img = pl.imread(self.img_dir + str(self.cell_types[x, y]) + '.png')
                     ax.imshow(img, extent=[x, x + 1, y, y + 1])
 
-        width = np.divide(width, self.n_try * 10)
-
         # arrows
-        for i, line in enumerate(lines):
-            if line[0][0] == line[1][0]:
-                dx = 0
-                dy = 0.4
-            else:
-                slope = (line[1][1] - line[0][1]) / (line[1][0] - line[0][0])
-                sign = 1 if slope >= 0 else -1
-                dx = sign * 0.4 / (np.sqrt(1 + slope * slope))
-                dy = slope * dx
-            x = line[0][0] - dx / 4
-            y = line[0][1] - dy / 4
-            ax.arrow(x, y, dx, dy, head_length=2.5 * width[i], width=width[i],
-                     length_includes_head=True, color=colors[i])
-
+        if arrow_plot:
+            width = np.divide(width, self.n_try * 10)
+            for i, line in enumerate(lines):
+                if line[0][0] == line[1][0]:
+                    dx = 0
+                    dy = 0.4
+                else:
+                    slope = (line[1][1] - line[0][1]) / (line[1][0] - line[0][0])
+                    sign = 1 if slope >= 0 else -1
+                    dx = sign * 0.4 / (np.sqrt(1 + slope * slope))
+                    dy = slope * dx
+                x = line[0][0] - dx / 4
+                y = line[0][1] - dy / 4
+                ax.arrow(x, y, dx, dy, head_length=2.5 * width[i], width=width[i],
+                         length_includes_head=True, color=colors[i])
+        else:
+            width = np.divide(width, self.n_try / 5)
+            lc = mc.LineCollection(lines, colors=colors, linewidths=width)
+            ax.add_collection(lc)
         ax.autoscale()
         pl.grid(True, linewidth=0.2, color='black')
         ax.set_xticks([])
@@ -107,13 +111,17 @@ def test_PlotPath():
     # test PlotPath
     width = 7
     height = 10
-    cell_types = make_default_cell_types(width, height)
-    plt_path = PlotPath(width, height, n_try=1, start_point=(2, 0), cell_types=cell_types, img_dir='../../cell_types/')
-    plt_path.add_line(0, 7, 'orange')
-    plt_path.add_line(7, 15, 'deepskyblue')
-    plt_path.add_line(15, 16, 'orange')
+    cell_types = make_default_lane_keeping_cell_types(width, height)
+    plt_path = PlotPath(width, height, n_try=1, start_point=(3, 0), cell_types=cell_types, img_dir='../../cell_types/')
+    # plt_path.add_line(0, 7, 'orange')
+    # plt_path.add_line(7, 15, 'deepskyblue')
+    # plt_path.add_line(15, 16, 'orange')
     pl = plt_path.plot()
-    pl.show()
+    # pl.show()
+    pl.tight_layout()
+    pl.margins(0, 0)
+    pl.savefig('../../outputs/lane_keeping.png', bbox_inches='tight',
+               pad_inches=0)
 
 
 if __name__ == '__main__':
