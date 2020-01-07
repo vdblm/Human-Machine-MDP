@@ -2,7 +2,7 @@ from environments.episode_mdp import EpisodicMDP
 import numpy as np
 
 
-def in_range(i, ranges):
+def __in_range(i, ranges):
     for range in ranges:
         if range[0] <= i <= range[1]:
             return True
@@ -22,31 +22,33 @@ def make_default_cell_types(width, height):
 
     for x in range(width):
         for y in range(height):
-            if in_range(x, stone_width_ranges):
+            if __in_range(x, stone_width_ranges):
                 cell_type = 'stone'
-            elif in_range(x, grass_width_ranges):
+            elif __in_range(x, grass_width_ranges):
                 cell_type = 'grass'
-            elif not in_range(x, lane_width_ranges) and in_range(y, lane_height_range):
+            elif not __in_range(x, lane_width_ranges) and __in_range(y, lane_height_range):
                 cell_type = 'grass'
             else:
                 cell_type = 'road'
             cell_types[x, y] = cell_type
-            # end cell
-            cell_types[np.math.floor((width - 1) / 2), height - 1] = 'end'
+            # end cell TODO we may not need an end cell
+            # cell_types[np.math.floor((width - 1) / 2), height - 1] = 'end'
 
     return cell_types
 
 
-def make_lane_keeping(width=7, height=10, costs=None, cell_types=None):
+def make_lane_keeping(width, height, costs, cell_types=None, start_cell=None):
     """
     lane keeping example in the paper. each cell is a 'road', 'grass', 'stone', or 'end'.
-
+    TODO it's a deterministic env now, we may add some noise to transition probs
     :type width: int
     :type height: int
     :param cell_types: {(x, y): type} defines type ('road', etc) of each state (x, y)
     :type cell_types: dict
-    :param costs: {type: cost}
+    :param costs: cost of each cell type {type: cost}
     :type costs: dict
+    :param start_cell: (x, y) coordinate of the starting cell
+    :type start_cell: tuple
 
     episode length is `height`.
 
@@ -59,25 +61,24 @@ def make_lane_keeping(width=7, height=10, costs=None, cell_types=None):
     n_states = width * height
     ep_l = height
 
-    if costs is None:
-        costs = {'road': 0.1, 'grass': 0.2, 'stone': 0.3, 'end': 0}
-
     if cell_types is None:
         cell_types = make_default_cell_types(width, height)
+    if start_cell is None:
+        start_cell = (np.math.ceil(2 * width / 7), 0)
 
     # true costs and transitions
     cost_true = {}
     transition_true = {}
 
-    def next_state(x, y, a):
-        y_n = y + 1
-        x_n = x + a - 1
+    def __next_state(xx, yy, aa):
+        yy_n = yy + 1
+        xx_n = xx + aa - 1
         # if the next cell is wall
-        if x_n >= width or x_n < 0:
-            x_n = x
-        if y_n >= height:
-            y_n = y
-        return x_n, y_n
+        if xx_n >= width or xx_n < 0:
+            xx_n = xx
+        if yy_n >= height:
+            yy_n = yy
+        return xx_n, yy_n
 
     # states = (x, y) will be y * width + x
     for x in range(width):
@@ -90,10 +91,11 @@ def make_lane_keeping(width=7, height=10, costs=None, cell_types=None):
             # transitions
             for a in range(n_actions):
                 transition_true[s, a] = np.zeros(n_states, dtype=np.float)
-                x_n, y_n = next_state(x, y, a)
+                x_n, y_n = __next_state(x, y, a)
 
                 s_n = y_n * width + x_n
                 transition_true[s, a][s_n] = 1
 
-    lane_keeping = EpisodicMDP(n_states, n_actions, ep_l, cost_true, transition_true)
+    lane_keeping = EpisodicMDP(n_states, n_actions, ep_l, cost_true, transition_true,
+                               start_state=start_cell[0] + start_cell[1] * width)
     return lane_keeping, cost_true, transition_true

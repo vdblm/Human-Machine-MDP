@@ -30,6 +30,7 @@ class EpisodicMDP:
         self.__probs = transition_probs
 
         # current state and time
+        self.start_state = start_state
         self.state = start_state
         self.time_step = 0
 
@@ -38,7 +39,7 @@ class EpisodicMDP:
         resets the env.
         """
         self.time_step = 0
-        self.state = 0
+        self.state = self.start_state
 
     def step_forward(self, action):
         """
