@@ -9,13 +9,14 @@ class PlotPath:
     plot agent path in a grid experiment
     """
 
-    def __init__(self, width, height, n_try, cell_types=None, img_dir=None, start_point=None):
+    def __init__(self, width, height, n_try, start_point, cell_types=None, img_dir=None):
         """
 
         :param n_try: number of repeating the experiment
         :param cell_types: type of each cell like 'road', 'grass', etc.
         :type cell_types: dict
         :param img_dir: directory of cell types images
+        :type start_point: tuple
         """
         self.width = width
         self.height = height
@@ -27,9 +28,6 @@ class PlotPath:
 
         # lines {(org_x, org_y, dest_x, dest_y, color): count}
         self.lines = defaultdict(int)
-
-        if img_dir is None:
-            self.img_dir = '../../cell_types/'
 
     def add_line(self, src_state, dst_state, color):
         """
@@ -57,6 +55,8 @@ class PlotPath:
 
         # add image
         if self.cell_types is not None:
+            if self.img_dir is None:
+                raise Exception('Image directory is not defined')
             for x in range(self.width):
                 for y in range(self.height):
                     if self.cell_types[x, y] == 'end':
@@ -74,9 +74,12 @@ class PlotPath:
                 dy = 0.4
             else:
                 slope = (line[1][1] - line[0][1]) / (line[1][0] - line[0][0])
-                dx = 0.4 / (np.sqrt(1 + slope * slope))
+                sign = 1 if slope >= 0 else -1
+                dx = sign * 0.4 / (np.sqrt(1 + slope * slope))
                 dy = slope * dx
-            ax.arrow(line[0][0] - dx / 4, line[0][1] - dy / 4, dx, dy, head_length=2.5 * width[i], width=width[i],
+            x = line[0][0] - dx / 4
+            y = line[0][1] - dy / 4
+            ax.arrow(x, y, dx, dy, head_length=2.5 * width[i], width=width[i],
                      length_includes_head=True, color=colors[i])
 
         ax.autoscale()
@@ -86,17 +89,15 @@ class PlotPath:
 
         # add grid lines
         ratio = 10
-        x = np.linspace(0, self.width - 1, self.width * ratio)
+        x = np.linspace(0, self.width, self.width * ratio)
         for y in range(self.height):
             ax.plot(x, [y for i in range(self.width * ratio)], color='black', linewidth=0.2)
 
-        y = np.linspace(0, self.height - 1, self.height * ratio)
+        y = np.linspace(0, self.height, self.height * ratio)
         for x in range(self.width):
             ax.plot([x for i in range(self.height * ratio)], y, color='black', linewidth=0.2)
 
         # start point
-        if self.start_point is None:
-            self.start_point = (2, 0)
         pl.text(self.start_point[0] + 0.5, self.start_point[1] + 0.5, 'Start', horizontalalignment='center',
                 verticalalignment='center')
         return pl
@@ -104,13 +105,14 @@ class PlotPath:
 
 def test_PlotPath():
     # test PlotPath
-    cell_types = make_default_cell_types(7, 10)
-    plt_path = PlotPath(7, 10, 1, cell_types=cell_types)
+    width = 7
+    height = 10
+    cell_types = make_default_cell_types(width, height)
+    plt_path = PlotPath(width, height, n_try=1, start_point=(2, 0), cell_types=cell_types, img_dir='../../cell_types/')
     plt_path.add_line(0, 7, 'orange')
     plt_path.add_line(7, 15, 'deepskyblue')
     plt_path.add_line(15, 16, 'orange')
     pl = plt_path.plot()
-    pl.tight_layout()
     pl.show()
 
 
