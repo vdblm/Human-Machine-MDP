@@ -2,7 +2,7 @@ from collections import defaultdict
 import numpy as np
 import pylab as pl
 from matplotlib import collections as mc
-from environments.lane_keeping import make_default_lane_keeping_cell_types
+from environments.lane_keep_obstcl_avoid import make_default_cell_types, add_obstacles
 
 
 class PlotPath:
@@ -60,10 +60,8 @@ class PlotPath:
                 raise Exception('Image directory is not defined')
             for x in range(self.width):
                 for y in range(self.height):
-                    if self.cell_types[x, y] == 'end':
-                        pl.text(x + 0.5, y + 0.5, 'End', horizontalalignment='center', verticalalignment='center')
-                        continue
-                    img = pl.imread(self.img_dir + str(self.cell_types[x, y]) + '.png')
+                    cell_type = str(self.cell_types[x, y])
+                    img = pl.imread(self.img_dir + cell_type + '.png')
                     ax.imshow(img, extent=[x, x + 1, y, y + 1])
 
         # arrows
@@ -111,17 +109,17 @@ def test_PlotPath():
     # test PlotPath
     width = 7
     height = 10
-    cell_types = make_default_lane_keeping_cell_types(width, height)
+    cell_types = make_default_cell_types(width, height, lane=False)
+    cell_types = add_obstacles(cell_types, start_cell=(3, 0), probs={'road': .7, 'gravel': .2, 'car': .1})
+    cell_types[(2, 3)] = 'car'
+    cell_types[(3, 1)] = 'car'
+    cell_types[(3, 3)] = 'gravel'
     plt_path = PlotPath(width, height, n_try=1, start_point=(3, 0), cell_types=cell_types, img_dir='../../cell_types/')
-    # plt_path.add_line(0, 7, 'orange')
-    # plt_path.add_line(7, 15, 'deepskyblue')
-    # plt_path.add_line(15, 16, 'orange')
+    plt_path.add_line(0, 7, 'orange')
+    plt_path.add_line(7, 15, 'deepskyblue')
+    plt_path.add_line(15, 16, 'orange')
     pl = plt_path.plot()
-    # pl.show()
-    pl.tight_layout()
-    pl.margins(0, 0)
-    pl.savefig('../../outputs/lane_keeping.png', bbox_inches='tight',
-               pad_inches=0)
+    pl.show()
 
 
 if __name__ == '__main__':

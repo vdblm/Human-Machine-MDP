@@ -9,7 +9,8 @@ def __in_range(i, ranges):
     return False
 
 
-def make_default_lane_keeping_cell_types(width, height):
+def make_default_cell_types(width, height, lane=True, grass_line=True, stone_line=True):
+    # TODO: width should be at least 7
     cell_types = {}
     # cell_types default value
     if cell_types is None:
@@ -22,11 +23,11 @@ def make_default_lane_keeping_cell_types(width, height):
 
     for x in range(width):
         for y in range(height):
-            if __in_range(x, stone_width_ranges):
+            if stone_line and __in_range(x, stone_width_ranges):
                 cell_type = 'stone'
-            elif __in_range(x, grass_width_ranges):
+            elif grass_line and __in_range(x, grass_width_ranges):
                 cell_type = 'grass'
-            elif not __in_range(x, lane_width_ranges) and __in_range(y, lane_height_range):
+            elif lane and not __in_range(x, lane_width_ranges) and __in_range(y, lane_height_range):
                 cell_type = 'grass'
             else:
                 cell_type = 'road'
@@ -37,9 +38,24 @@ def make_default_lane_keeping_cell_types(width, height):
     return cell_types
 
 
-def make_lane_keeping(width, height, costs, cell_types, start_cell=None):
+def add_obstacles(cell_types, start_cell, probs):
     """
-    lane keeping example in the paper. each cell is a 'road', 'grass', 'stone', or 'end'.
+    :param probs: {'road': p1, 'gravel': p2, 'car': p3}
+    :type probs: dict
+    """
+
+    for cell, type in cell_types.items():
+        if cell[0] is start_cell[0] and cell[1] is start_cell[1]:
+            continue
+        if type is 'road':
+            cell_types[cell] = np.random.choice(list(probs.keys()), size=1, p=list(probs.values()))[0]
+
+    return cell_types
+
+
+def make_grid_env(width, height, costs, cell_types, start_cell=None):
+    """
+    lane keeping example in the paper. each cell is a 'road', 'grass', 'stone', 'gravel', or 'car'.
     TODO it's a deterministic env now, we may add some noise to transition probs
     :type width: int
     :type height: int
@@ -53,9 +69,6 @@ def make_lane_keeping(width, height, costs, cell_types, start_cell=None):
     episode length is `height` - 1.
 
     """
-
-    # TODO: width should be at least 7
-
     # actions = [left turn, keep straight, right turn]
     n_actions = 3
     n_states = width * height
@@ -86,7 +99,7 @@ def make_lane_keeping(width, height, costs, cell_types, start_cell=None):
             for a in range(n_actions):
                 cost_true[s, a] = c
 
-            # transitions
+            # transitions # TODO reaching to wall ?
             for a in range(n_actions):
                 transition_true[s, a] = np.zeros(n_states, dtype=np.float)
                 x_n, y_n = __next_state(x, y, a)
