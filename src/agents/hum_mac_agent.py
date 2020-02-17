@@ -1,0 +1,87 @@
+"""
+Implementation of the human/machine policies in the paper
+"""
+from agents.switching_agents import Agent
+import numpy as np
+
+from environments.episodic_mdp import EpisodicMDP, GridMDP
+from environments.make_envs import FeatureStateHandler, TYPE_COSTS
+
+
+class NoisyDriverAgent(Agent):
+    def __init__(self, noise_sd: float = 0, car_fear: float = None):
+        """
+        A noisy driver, which chooses the cell with the lowest noisy estimated cost.
+
+        Parameters
+        ----------
+        noise_sd : float
+            Standard deviation of the Gaussian noise (i.e., `N(0, noise_sd)`)
+        car_fear : float
+            Probability of moving to a 'car' type cell (i.e., $p_{panic}$ in the paper)
+        """
+        super().__init__()
+        self.car_fear = car_fear
+        self.noise_sd = noise_sd
+        # [left, straight, right]
+        self.n_action = 3
+
+    def update_policy(self, env: EpisodicMDP, sensor_based, type_costs=TYPE_COSTS):
+
+        if not sensor_based:
+            assert isinstance(env, GridMDP), 'invalid environment class'
+
+        for s in range(env.n_state):
+            self.policy[s] = np.zeros(self.n_action)
+            if not sensor_based:
+                type_costs[None] = np.nan
+                x = s % env.width
+                y = s // env.width
+                # straight action on the top lane
+                if y >= env.height - 1:
+                    self.policy[s][1] = 1
+                    continue
+                types = [env.cell_types.get((x + a - 1, y + 1)) for a in range(self.n_action)]
+            else:
+                type_costs['wall'] = np.nan
+                f_s = FeatureStateHandler().state2feature(s)
+                types = [f_s[i] for i in range(1, 4)]
+
+            noisy_actions = []
+            feared = False
+            for a in range(self.n_action):
+                if types[a] == 'car' and self.car_fear is not None:
+                    self.policy[s][a] = self.car_fear
+                    feared = True
+                else:
+                    noisy_actions.append(a)
+
+            next_cells = [type_costs[t] for t in types]
+            flag = False
+            for a in noisy_actions:
+                if not np.isnan(next_cells[a]):
+                    flag = True
+            if len(noisy_actions) > 0 and flag:
+                if self.noise_sd != 0:
+                    tmp = np.asarray(
+                        [np.nanargmin(
+                            [next_cells[a] + np.random.normal(0, self.noise_sd) for a in noisy_actions])
+                            for j in range(1000)])
+                    for i, a in enumerate(noisy_actions):
+                        self.policy[s][a] = len(np.where(tmp == i)[0]) / len(tmp)
+                        if feared:
+                            self.policy[s][a] *= (1 - self.car_fear)
+                else:
+                    next_cells = [next_cells[a] for a in noisy_actions]
+                    min_as = np.where(next_cells == np.nanmin(next_cells))[0]
+                    for i in min_as:
+                        self.policy[s][noisy_actions[i]] = 1 / len(min_as)
+                        if feared:
+                            self.policy[s][noisy_actions[i]] *= (1 - self.noise_sd)
+
+            if np.sum(self.policy[s]) == 0:
+                self.policy[s] = np.asarray([1 / 3, 1 / 3, 1 / 3])
+            self.policy[s] /= np.sum(self.policy[s])
+
+    def take_action(self, curr_state):
+        return np.random.choice(range(self.n_action), p=self.policy[curr_state])
