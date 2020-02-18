@@ -55,10 +55,10 @@ def format_axes(ax):
 
 
 COLORS = ['#3E9651', '#CC2529', '#396AB1', '#535154']
+golden_ratio = (np.sqrt(5) - 1.0) / 2
 
 
 def plot_regret(alg2_regret, greedy_regret, file_name):
-    golden_ratio = (np.sqrt(5) - 1.0) / 2
     width = 1.3
     height = width * golden_ratio
 
@@ -74,5 +74,21 @@ def plot_regret(alg2_regret, greedy_regret, file_name):
 
     ax.set_ylabel(r'Regret, $R(T)$')
     ax.set_xlabel(r'Episode, $k$')
+    ax.legend(frameon=False)
+    fig.savefig(os.path.join(OUTPUT_DIR, file_name), bbox_inches='tight')
+
+
+def plot_change_sd(sd_range, y, y_label, legend_label, file_name):
+    height = 1.5
+    width = height / golden_ratio
+    latexify(fig_height=height, fig_width=width, font_size=5, legend_size=3.9)
+    fig, ax = plt.subplots()
+    ax = format_axes(ax)
+    line_width = 1
+    ax.plot(sd_range, y, COLORS[0], label=legend_label, linestyle='solid',
+            linewidth=line_width, marker='d', ms=2)
+
+    ax.set_ylabel(y_label)
+    ax.set_xlabel(r'$\sigma_{\mathbb{H}}$')
     ax.legend(frameon=False)
     fig.savefig(os.path.join(OUTPUT_DIR, file_name), bbox_inches='tight')

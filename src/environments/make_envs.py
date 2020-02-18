@@ -3,7 +3,7 @@ Environment types in the paper for both cell-based and sensor-based state spaces
 """
 
 from environments.episodic_mdp import GridMDP, EpisodicMDP
-from environments.env_types import *
+from environments.env_types import EnvironmentType
 import numpy as np
 
 # default number of features in sensor-based state space
@@ -67,8 +67,8 @@ class FeatureStateHandler:
 
         values = [self.type_value[g] for g in feature_vec]
         state_num = 0
-        for i in range(len(values)):
-            state_num += values[i] * np.power(self.base, len(values) - i - 1)
+        for i, value in enumerate(values):
+            state_num += value * np.power(self.base, len(values) - i - 1)
         return state_num
 
     def state2feature(self, state: int):
@@ -217,10 +217,9 @@ def make_sensor_based_env(env_type: EnvironmentType, ep_l: int = EP_L, type_cost
         # positions: 0=left, 1=middle, 2=right
         if f[1] == 'wall':
             return 0
-        elif f[3] == 'wall':
+        if f[3] == 'wall':
             return 2
-        else:
-            return 1
+        return 1
 
     def __calc_prob(f_s, f_sn, a):
         # raise exception when the action goes to wall
@@ -238,10 +237,10 @@ def make_sensor_based_env(env_type: EnvironmentType, ep_l: int = EP_L, type_cost
         # calculate the probability
         if pos_n == 0:
             return 1 * type_probs[f_sn[2]] * middle_prob
-        elif pos_n == 1:
+        if pos_n == 1:
             return type_probs[f_sn[1]] * middle_prob * type_probs[f_sn[3]]
-        else:
-            return middle_prob * type_probs[f_sn[2]] * 1
+
+        return middle_prob * type_probs[f_sn[2]] * 1
 
     # actions = [left, straight, right]
     n_action = 3
