@@ -6,8 +6,6 @@ import matplotlib as mpl
 mpl.use('pdf')
 import matplotlib.pyplot as plt
 
-from plots import latexify, format_axes
-
 
 def latexify(fig_width=None, fig_height=None, columns=1, largeFonts=False, small_font=7):
     """Set up matplotlib's RC params for LaTeX plotting.

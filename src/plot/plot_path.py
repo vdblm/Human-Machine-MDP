@@ -8,7 +8,7 @@ from environments.episodic_mdp import GridMDP
 from definitions import ROOT_DIR
 
 IMG_DIR = os.path.join(ROOT_DIR, 'cell_types/')
-OUTPUT_DIR = os.path.join(ROOT_DIR, 'output/')
+OUTPUT_DIR = os.path.join(ROOT_DIR, 'outputs/')
 
 HUMAN_COLOR = 'orange'
 MACHINE_COLOR = 'deepskyblue'
@@ -108,10 +108,9 @@ class PlotPath:
             ax.plot([x for i in range(self.height * ratio)], y, color='gray', linewidth=0.2)
 
         # plot
-        pl.tight_layout()
-        pl.margins(0, 0)
+        fig.tight_layout()
         # TODO only png?
-        pl.savefig(OUTPUT_DIR + file_name + '.png', bbox_inches='tight', pad_inches=0)
+        fig.savefig(OUTPUT_DIR + file_name + '.png', bbox_inches='tight', pad_inches=0)
         pl.close()
 
         # clear `self.lines`

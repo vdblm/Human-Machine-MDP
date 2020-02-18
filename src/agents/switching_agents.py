@@ -14,19 +14,15 @@ class Agent:
 
     def __init__(self):
         self.policy = {}
-        pass
 
     def update_obs(self, *args):
         """Add observations to the record"""
-        pass
 
     def update_policy(self, *args):
         """Update the action policy"""
-        pass
 
     def take_action(self, *args):
         """Return an action based on the policy"""
-        pass
 
 
 class SwitchingAgent(Agent):
@@ -97,7 +93,8 @@ class SwitchingAgent(Agent):
         # TODO may update cost and transition history
 
 
-class UCB(SwitchingAgent):
+# TODO refactor!
+class Alg2(SwitchingAgent):
     def __init__(self, env, agent0, agent1, switching_cost, agent0_cost, agent1_cost, delta, unknown_agent=0):
         super().__init__(env, agent0, agent1, switching_cost, agent0_cost, agent1_cost)
         self.unknown_agent = unknown_agent
@@ -112,13 +109,9 @@ class UCB(SwitchingAgent):
 
         self.delta = delta
         self.episode_num = 0
-        self.special_value = {}
         self.N_sa = np.zeros(shape=(env.n_state, env.n_action))
         self.emp_policy = np.true_divide(np.ones(shape=(self.env.n_state, self.env.n_action)), self.env.n_action)
         self.beta_t = np.zeros(self.env.n_state)
-
-    def update_episode_num(self, k):
-        self.episode_num = k
 
     def update_empirical(self):
         history = self.agent_history[self.unknown_agent]
@@ -138,7 +131,7 @@ class UCB(SwitchingAgent):
             if t_k == 0:
                 self.beta_t[s] = 0
             else:
-                # TODO beta is changed. no 14!
+                # TODO beta may be smaller than what in the paper
                 coef = 1 / 10
                 self.beta_t[s] = np.sqrt(
                     coef * self.env.n_action * np.log(self.env.n_state * t_k / self.delta) / max(N_s, 1))
@@ -166,7 +159,8 @@ class UCB(SwitchingAgent):
 
         self.agents[self.unknown_agent] = unknown_agent
 
-    def update_policy(self):
+    def update_policy(self, ep_num):
+        self.episode_num = ep_num
         self.update_empirical()
         # dynamic programming
         for t in range(self.env.ep_l - 1, -1, -1):
@@ -184,11 +178,6 @@ class UCB(SwitchingAgent):
                     else:
                         v0[a] = self.costs[s, a]
                         v1[a] = self.costs[s, a]
-
-                    # TODO badsmell here
-                    # if s is something like x, wall, car, road (x320) save it
-                    if s % 64 == 56:
-                        self.special_value[t, s, a] = (v0[a], v1[a])
 
                 # Finds optimistic agents
                 self.find_agent(action_values=[v0, v1], state=s)
@@ -217,7 +206,7 @@ class UCB(SwitchingAgent):
                         self.value[t][s] = agnt1
 
 
-class Greedy(UCB):
+class Greedy(Alg2):
     def find_agent(self, action_values, state):
         self.agents[self.unknown_agent].policy[state] = self.emp_policy[state]
 
@@ -252,10 +241,6 @@ class Optimal(SwitchingAgent):
                     else:
                         v0[a] = self.costs[s, a]
                         v1[a] = self.costs[s, a]
-
-                    # Finds optimistic agents TODO this Optimal belief should be implemented in beliefs.py.
-                    # It works for fixed belief
-                    # self.agents = [self.agents[0].sample(v0, s, t), self.agents[1].sample(v1, s, t)]
 
                 v0_exp = np.dot(self.agents[0].policy[s], v0)
                 v1_exp = np.dot(self.agents[1].policy[s], v1)

@@ -1,133 +1,32 @@
 """
 Implementation of the known and unknown human experiments in the paper
 """
+import os
 
 from environments.env_types import EnvironmentType
-from agents.switching_agents import Agent, Optimal, UCB, Greedy
-from agents.hum_mac_agent import NoisyDriverAgent
+from agents.switching_agents import Agent, Optimal, Alg2, Greedy
+from agents.hum_mac_agent import NoisyDriverAgent, UniformDriverAgent
 from environments.episodic_mdp import GridMDP
-from environments.make_envs import make_cell_based_env, make_sensor_based_env
+from environments.make_envs import make_cell_based_env, make_sensor_based_env, grid_feature_extractor, \
+    sensor_feature_extractor
 from plot.plot_path import PlotPath, HUMAN_COLOR, MACHINE_COLOR
+import numpy as np
 
 
 class SwitchingExperiment:
-    def __init__(self, env_type: EnvironmentType, machine_agent: NoisyDriverAgent, human_agent: NoisyDriverAgent,
-                 feature_ext: function, sensor_based: bool = False):
-        """
-        Parameters
-        ----------
-        feature_ext : function
-            A feature extractor function. It can be sensor-based or grid-based.
-            A grid-based feature extractor returns the state itself, while
-            a sensor-based return a 4-dim feature vector.
-        sensor_based : bool
-            Indicates if the state space is sensor-based.
-        """
+    """
+    Known and unknown switching experiments.
+    Child classes are `CellBasedSwitchingExperiment` and `SensorBasedSwitchingExperiment`
+    """
+
+    def __init__(self, env_type: EnvironmentType, machine_agent: NoisyDriverAgent, human_agent: NoisyDriverAgent):
         self.env_type = env_type
         self.agent0 = machine_agent
         self.agent1 = human_agent
-        self.feat_ext = feature_ext
-        self.sensor_based = sensor_based
+        self.feat_ext = None
 
-    def run_known_human_exp(self, human_cost: float, switching_cost: float, n_try: int = 100, plot: bool = True,
-                            plot_file: str = None):
-        """ run the known human experiment in the paper """
-
-        # generate an env with cell-based state space based on `self.env_type`
-        env = make_cell_based_env(self.env_type)
-
-        # for a sensor-based state space, switching policy is trained only over
-        # the environment type not the grid environment
-        if self.sensor_based:
-            train_env = make_sensor_based_env(self.env_type)
-        else:
-            train_env = env
-
-        # update agents' action policies
-        self.agent0.update_policy(train_env, sensor_based=self.sensor_based)
-        self.agent1.update_policy(train_env, sensor_based=self.sensor_based)
-
-        # find the optimal switching policy
-        optimal_switching_agent = Optimal(env=train_env, agent0=self.agent0, agent1=self.agent1,
-                                          switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost)
-        optimal_switching_agent.update_policy()
-
-        # evaluate and plot
-        plt_path = PlotPath(env, n_try)
-        result = self.__learn_evaluate(is_learn=False, env=env, switching_agent=optimal_switching_agent,
-                                       switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
-                                       n_try=n_try,
-                                       plt_path=plt_path)
-        if plot:
-            if plot_file is None:
-                plot_file = 'h_' + str(human_cost) + '_s_' + str(switching_cost)
-            plt_path.plot(plot_file)
-        return result
-
-    def run_unknown_human_exp(self, n_episode, switching_cost, human_cost, n_try, plot_epochs, plot_path):
-        # only for sensor-based
-        assert self.sensor_based, 'consider a sensor-based experiment for the unknown case'
-        train_env = make_sensor_based_env(self.env_type)
-
-        # update agents' action policies
-        self.agent0.update_policy(train_env, sensor_based=self.sensor_based)
-        self.agent1.update_policy(train_env, sensor_based=self.sensor_based)
-
-        optimal_switching_agent = Optimal(env=train_env, agent0=self.agent0, agent1=self.agent1,
-                                          switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost)
-        optimal_switching_agent.update_policy()
-
-        # unknown agent is human (agent1)
-        ucb_agent = UCB(env=train_env, agent0=self.agent0, agent1=self.agent1, switching_cost=switching_cost,
-                        agent0_cost=0, agent1_cost=human_cost, delta=0.1, unknown_agent=1)
-
-        greedy_agent = Greedy(env=train_env, agent0=self.agent0, agent1=self.agent1, switching_cost=switching_cost,
-                              agent0_cost=0, agent1_cost=human_cost, delta=0.1, unknown_agent=1)
-
-        ucb_regret = []
-        greedy_regret = []
-
-        for ep in range(n_episode):
-            ucb_agent.update_episode_num(ep)
-            ucb_agent.update_policy()
-            greedy_agent.update_policy()
-
-            # initialize a new grid env for this episode
-            grid_env = make_cell_based_env(self.env_type)
-            result = self.__learn_evaluate(is_learn=False, env=grid_env, switching_agent=optimal_switching_agent,
-                                           switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
-                                           n_try=n_try)
-            optimal_value = result['exp_cost']
-
-            if ep in plot_epochs:
-                plt_path = PlotPath(grid_env, n_try)
-            else:
-                plt_path = None
-            ucb_result = self.__learn_evaluate(is_learn=False, env=grid_env, switching_agent=ucb_agent,
-                                               switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
-                                               n_try=n_try)
-            greedy_result = self.__learn_evaluate(is_learn=False, env=grid_env, switching_agent=greedy_agent,
-                                                  switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
-                                                  n_try=n_try)
-
-            ucb_regret.append(ucb_result['exp_cost'] - optimal_value)
-            greedy_regret.append(greedy_result['exp_cost'] - optimal_value)
-            if plt_path is not None:
-                plot_file = plot_path + '_ep_' + str(ep) + 'png'
-                plt_path.plot(plot_file)
-
-            self.__learn_evaluate(is_learn=True, env=grid_env, switching_agent=ucb_agent,
-                                  switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
-                                  n_try=1)
-            self.__learn_evaluate(is_learn=True, env=grid_env, switching_agent=greedy_agent,
-                                  switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
-                                  n_try=1)
-            grid_env.reset()
-
-        return ucb_regret, greedy_regret
-
-    def __learn_evaluate(self, is_learn: bool, env: GridMDP, switching_agent: Agent, switching_cost: float,
-                         agent0_cost: float, agent1_cost: float, n_try=1, plt_path=None):
+    def learn_evaluate(self, is_learn: bool, env: GridMDP, switching_agent: Agent, switching_cost: float,
+                       agent0_cost: float, agent1_cost: float, n_try=1, plt_path=None):
         """
         Learn or evaluate a switching policy in a grid environment.
 
@@ -191,4 +90,212 @@ class SwitchingExperiment:
                   'human_control_rate': human_control / count,
                   'exp_switch': switch_number / n_try}
 
+        return result
+
+    def run_known_human_exp(self, human_cost: float, switching_cost: float, n_try: int = 100, plot: bool = True,
+                            plot_name: str = None):
+        """
+        Run the known human experiment in the paper.
+        It generates a grid environment based on `self.env_type`
+        and runs the optimal switching policy in it.
+
+        Parameters
+        ----------
+        human_cost: float
+        switching_cost: float
+        n_try: int
+            Number of repeating the experiment
+        plot: bool
+            If `plot==True`, then the trajectory induced by
+            the optimal switching policy will be plotted.
+        plot_name : str
+            Name of the output plot. If `None`, then
+            it will be "h_{human_cost}_s_{switching_cost}"
+
+        Returns
+        -------
+        result : dict
+            A dictionary that contains the expected total cost,
+            expected environment cost, human control rate, and
+            expected number of switching.
+        """
+
+
+class SensorBasedSwitchingExperiment(SwitchingExperiment):
+    def __init__(self, env_type: EnvironmentType, machine_agent: NoisyDriverAgent, human_agent: NoisyDriverAgent):
+        super().__init__(env_type, machine_agent, human_agent)
+        self.feat_ext = sensor_feature_extractor
+
+        # for a sensor-based state space, switching policy is trained only over
+        # the environment type not the grid environment
+        self.train_env = make_sensor_based_env(self.env_type)
+
+        # update agents' action policies
+        self.agent0.update_policy(self.train_env, sensor_based=True)
+        self.agent1.update_policy(self.train_env, sensor_based=True)
+
+        # uniform agent
+        self.uniform_agent = UniformDriverAgent(self.train_env, sensor_based=True)
+
+    def run_known_human_exp(self, human_cost: float, switching_cost: float, n_try: int = 100, plot: bool = True,
+                            plot_name: str = None):
+
+        # generate an env with cell-based state space based on `self.env_type`
+        env = make_cell_based_env(self.env_type)
+
+        # find the optimal switching policy
+        optimal_switching_agent = Optimal(env=self.train_env, agent0=self.agent0, agent1=self.agent1,
+                                          switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost)
+        optimal_switching_agent.update_policy()
+
+        # evaluate and plot
+        plt_path = PlotPath(env, n_try)
+        result = self.learn_evaluate(is_learn=False, env=env, switching_agent=optimal_switching_agent,
+                                     switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
+                                     n_try=n_try, plt_path=plt_path)
+        if plot:
+            if plot_name is None:
+                plot_name = 'h_{}_s_{}'.format(human_cost, switching_cost)
+            plt_path.plot(plot_name)
+        return result
+
+    def run_unknown_human_exp(self, n_episode: int, switching_cost: float, human_cost: float, n_try: int,
+                              plot_epochs: list = None, plot_dir: str = None, verbose: bool = True,
+                              log_freq: int = 100):
+        """
+        Run the unknown human experiment in the paper. In each episode,
+        it generates a new grid environment and runs the optimal algorithm (algorithm 1),
+        algorithm 2, and greedy algorithm to find the switching policy. To train the
+        switching agents, we only run once in an episode. However, the evaluation is done
+        by repeating the experiment `n_try` times in each episode (We don't train during evaluation).
+
+        Parameters
+        ---------
+        n_episode: int
+        switching_cost: float
+        human_cost: float
+        n_try: int
+            Number of repeating the experiment in each episode to evaluate the switching algorithms
+        plot_epochs: list
+            List of episode numbers in which the trajectory of algorithm 2 will be plotted.
+        plot_dir: str
+            Directory for saving the plots. If `None` no plot will be saved.
+        verbose : bool
+            If `True`, then it will print logs
+        log_freq : int
+            How many episodes between logging
+
+        Returns
+        -------
+        alg2_regret : list
+            A list containing the regret of algorithm 2 in each episode, i.e.,
+            `alg2_regret[i]` = expected cost of algorithm 2 - optimal expected cost in episode 'i'
+        greedy_regret : list
+            A list containing the regret of the greedy algorithm in each episode
+        """
+
+        if plot_epochs is None:
+            plot_epochs = []
+
+        optimal_switching_agent = Optimal(env=self.train_env, agent0=self.agent0, agent1=self.agent1,
+                                          switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost)
+        optimal_switching_agent.update_policy()
+
+        """
+        Note that both Alg2 and Greedy switching agents don't have access to the true human policy. 
+        Instead, they begin with a uniform action policy.
+        """
+        # the unknown agent is human (agent1)
+        alg2_switching_agent = Alg2(env=self.train_env, agent0=self.agent0, agent1=self.uniform_agent,
+                                    switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost, delta=0.1,
+                                    unknown_agent=1)
+
+        greedy_switching_agent = Greedy(env=self.train_env, agent0=self.agent0, agent1=self.uniform_agent,
+                                        switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost, delta=0.1,
+                                        unknown_agent=1)
+
+        alg2_regret = []
+        greedy_regret = []
+
+        for ep in range(n_episode):
+            alg2_switching_agent.update_policy(ep)
+            greedy_switching_agent.update_policy(ep)
+
+            # initialize a new grid env for this episode
+            grid_env = make_cell_based_env(self.env_type)
+
+            # evaluate the optimal policy
+            optimal_result = self.learn_evaluate(is_learn=False, env=grid_env,
+                                                 switching_agent=optimal_switching_agent,
+                                                 switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
+                                                 n_try=n_try)
+            optimal_value = optimal_result['exp_cost']
+
+            # plot the trajectory induced by algorithm 2
+            if ep in plot_epochs:
+                plt_path = PlotPath(grid_env, n_try)
+            else:
+                plt_path = None
+            # evaluate algorithm2 and greedy algorithm
+            alg2_result = self.learn_evaluate(is_learn=False, env=grid_env, switching_agent=alg2_switching_agent,
+                                              switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
+                                              n_try=n_try, plt_path=plt_path)
+
+            greedy_result = self.learn_evaluate(is_learn=False, env=grid_env, switching_agent=greedy_switching_agent,
+                                                switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
+                                                n_try=n_try)
+
+            alg2_regret.append(alg2_result['exp_cost'] - optimal_value)
+            greedy_regret.append(greedy_result['exp_cost'] - optimal_value)
+
+            if plt_path is not None:
+                plot_name = 'ep_{}'.format(ep)
+                plot_file = os.path.join(plot_dir, plot_name)
+                plt_path.plot(plot_file)
+
+            # learn algorithm2 and greedy algorithm
+            self.learn_evaluate(is_learn=True, env=grid_env, switching_agent=alg2_switching_agent,
+                                switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
+                                n_try=1)
+            self.learn_evaluate(is_learn=True, env=grid_env, switching_agent=greedy_switching_agent,
+                                switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
+                                n_try=1)
+            if verbose and ep % log_freq == 0:
+                print("################### Episode {} ###################".format(ep))
+                print('algorithm 2 cumulative regret: {}'.format(np.sum(alg2_regret)))
+                print('greedy algorithm cumulative regret: {}'.format(np.sum(greedy_regret)))
+            grid_env.reset()
+
+        return alg2_regret, greedy_regret
+
+
+class CellBasedSwitchingExperiment(SwitchingExperiment):
+    def __init__(self, env_type: EnvironmentType, machine_agent: NoisyDriverAgent, human_agent: NoisyDriverAgent):
+        super().__init__(env_type, machine_agent, human_agent)
+        self.feat_ext = grid_feature_extractor
+
+    def run_known_human_exp(self, human_cost: float, switching_cost: float, n_try: int = 100, plot: bool = True,
+                            plot_name: str = None):
+
+        # generate an env with cell-based state space based on `self.env_type`
+        env = make_cell_based_env(self.env_type)
+
+        # update agents' action policies
+        self.agent0.update_policy(env, sensor_based=False)
+        self.agent1.update_policy(env, sensor_based=False)
+
+        # find the optimal switching policy
+        optimal_switching_agent = Optimal(env=env, agent0=self.agent0, agent1=self.agent1,
+                                          switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost)
+        optimal_switching_agent.update_policy()
+
+        # evaluate and plot
+        plt_path = PlotPath(env, n_try)
+        result = self.learn_evaluate(is_learn=False, env=env, switching_agent=optimal_switching_agent,
+                                     switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
+                                     n_try=n_try, plt_path=plt_path)
+        if plot:
+            if plot_name is None:
+                plot_name = 'h_{}_s_{}'.format(human_cost, switching_cost)
+            plt_path.plot(plot_name)
         return result

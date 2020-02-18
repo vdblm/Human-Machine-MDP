@@ -212,72 +212,36 @@ def make_sensor_based_env(env_type: EnvironmentType, ep_l: int = EP_L, type_cost
         The sensor-based episodic MDP based on the environment type
     """
 
-    def __find_pos(f_s):
-        if f_s[1] == 'wall':
-            return 'left'
-        elif f_s[3] == 'wall':
-            return 'right'
+    def __find_pos(f):
+        # TODO only works for width=3. FIX IT
+        # positions: 0=left, 1=middle, 2=right
+        if f[1] == 'wall':
+            return 0
+        elif f[3] == 'wall':
+            return 2
         else:
-            return 'middle'
+            return 1
 
     def __calc_prob(f_s, f_sn, a):
-        # check the same state remains the same
-
-        if f_sn[0] != f_s[a + 1]:
-            return 0
-
+        # raise exception when the action goes to wall
         pos = __find_pos(f_s)
         pos_n = __find_pos(f_sn)
-        if pos == 'left':
-            if a == 1 and pos_n == 'left':
-                if middle_probs is None:
-                    p3 = type_probs[f_sn[3]]
-                else:
-                    p3 = middle_probs[f_sn[3]]
-                return type_probs[f_sn[2]] * p3
-            elif a == 1:
-                return 0
-            if a == 2:
-                p1 = type_probs[f_sn[2]]
-                if middle_probs is not None:
-                    p1 = middle_probs[f_sn[2]]
-                return type_probs[f_sn[1]] * p1 * type_probs[f_sn[3]]
+        if a != 1 and pos == a:
+            raise Exception('The action goes to wall')
 
-        if pos == 'right':
-            if a == 1 and pos_n == 'right':
-                if middle_probs is None:
-                    p1 = type_probs[f_sn[1]]
-                else:
-                    p1 = middle_probs[f_sn[1]]
-                return p1 * type_probs[f_sn[2]]
-            elif a == 1:
-                return 0
-            if a == 0:
-                p1 = type_probs[f_sn[2]]
-                if middle_probs is not None:
-                    p1 = middle_probs[f_sn[2]]
-                return type_probs[f_sn[1]] * p1 * type_probs[f_sn[3]]
+        check_correct_pos = pos + a - 1 == pos_n
+        if not check_correct_pos or f_sn[0] != f_s[a + 1]:
+            return 0
 
-        if pos == 'middle':
-            if a == 0 and pos_n == 'left':
-                p2 = type_probs[f_sn[3]]
-                if middle_probs is not None:
-                    p2 = middle_probs[f_sn[3]]
-                return type_probs[f_sn[2]] * p2
-            elif a == 0:
-                return 0
-            elif a == 2 and pos_n == 'right':
-                p2 = type_probs[f_sn[1]]
-                if middle_probs is not None:
-                    p2 = middle_probs[f_sn[1]]
-                return p2 * type_probs[f_sn[2]]
-            elif a == 2:
-                return 0
-            if a == 1:
-                p2 = type_probs[f_sn[2]]
-                if middle_probs is not None:
-                    p2 = middle_probs[f_sn[2]]
-                return type_probs[f_sn[1]] * p2 * type_probs[f_sn[3]]
+        middle_cell = 3 - pos_n
+        middle_prob = type_probs[f_sn[middle_cell]] if middle_probs is None else middle_probs[f_sn[middle_cell]]
+        # calculate the probability
+        if pos_n == 0:
+            return 1 * type_probs[f_sn[2]] * middle_prob
+        elif pos_n == 1:
+            return type_probs[f_sn[1]] * middle_prob * type_probs[f_sn[3]]
+        else:
+            return middle_prob * type_probs[f_sn[2]] * 1
 
     # actions = [left, straight, right]
     n_action = 3
@@ -312,9 +276,9 @@ def make_sensor_based_env(env_type: EnvironmentType, ep_l: int = EP_L, type_cost
 
                 # handle wall
                 # TODO the code works only when `n_feature = 4`. FIX IT
-                if feat_vec[1] == 'wall' and action == 0:
+                if __find_pos(feat_vec) == 0 and action == 0:
                     a1, a2 = 1, 2
-                elif feat_vec[3] == 'wall' and action == 2:
+                elif __find_pos(feat_vec) == 2 and action == 2:
                     a1, a2 = 0, 1
                 else:
                     a1, a2 = action, action

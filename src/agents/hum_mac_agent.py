@@ -63,10 +63,11 @@ class NoisyDriverAgent(Agent):
                     flag = True
             if len(noisy_actions) > 0 and flag:
                 if self.noise_sd != 0:
+                    # TODO may sample more than 100!
                     tmp = np.asarray(
                         [np.nanargmin(
                             [next_cells[a] + np.random.normal(0, self.noise_sd) for a in noisy_actions])
-                            for j in range(1000)])
+                            for j in range(100)])
                     for i, a in enumerate(noisy_actions):
                         self.policy[s][a] = len(np.where(tmp == i)[0]) / len(tmp)
                         if feared:
@@ -80,6 +81,46 @@ class NoisyDriverAgent(Agent):
                             self.policy[s][noisy_actions[i]] *= (1 - self.noise_sd)
 
             if np.sum(self.policy[s]) == 0:
+                self.policy[s] = np.asarray([1 / 3, 1 / 3, 1 / 3])
+            self.policy[s] /= np.sum(self.policy[s])
+
+    def take_action(self, curr_state):
+        return np.random.choice(range(self.n_action), p=self.policy[curr_state])
+
+
+class UniformDriverAgent(Agent):
+    def __init__(self, env: EpisodicMDP, sensor_based, type_costs=TYPE_COSTS):
+        """
+        A uniform driver, which chooses the next cell uniformly at random.
+        """
+        super().__init__()
+        if not sensor_based:
+            assert isinstance(env, GridMDP), 'invalid environment class'
+
+        self.n_action = 3
+        for s in range(env.n_state):
+            self.policy[s] = np.zeros(self.n_action)
+            if not sensor_based:
+                type_costs[None] = np.nan
+                x = s % env.width
+                y = s // env.width
+                # straight action on the top lane
+                if y >= env.height - 1:
+                    self.policy[s][1] = 1
+                    continue
+                types = [env.cell_types.get((x + a - 1, y + 1)) for a in range(self.n_action)]
+            else:
+                type_costs['wall'] = np.nan
+                f_s = FeatureStateHandler().state2feature(s)
+                types = [f_s[i] for i in range(1, 4)]
+
+            next_cells = [type_costs[t] for t in types]
+            non_nan_num = np.count_nonzero(~np.isnan(next_cells))
+            if non_nan_num > 0:
+                for a in range(self.n_action):
+                    if ~np.isnan(next_cells)[a]:
+                        self.policy[s][a] = 1 / non_nan_num
+            else:
                 self.policy[s] = np.asarray([1 / 3, 1 / 3, 1 / 3])
             self.policy[s] /= np.sum(self.policy[s])
 
