@@ -32,8 +32,8 @@ def change_sd(env_type: EnvironmentType, sd_range, env_num: int, human: NoisyDri
         human.noise_sd = sd
         total_switches = 0
         total_human_control = 0
+        experiment = SensorBasedSwitchingExperiment(env_type=env_type, machine_agent=machine, human_agent=human)
         for i in range(env_num):
-            experiment = SensorBasedSwitchingExperiment(env_type=env_type, machine_agent=machine, human_agent=human)
             result = experiment.run_known_human_exp(human_cost=human_cost, switching_cost=switching_cost, n_try=n_try,
                                                     plot=False)
             total_switches += result['exp_switch']

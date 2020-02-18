@@ -2,5 +2,6 @@ venv/*
 .idea/*
 **/__pycache__/*
 output/*
+outputs/*
 
 notes
