@@ -94,16 +94,21 @@ class FeatureStateHandler:
         return feature_vec
 
 
-def sensor_feature_extractor(env, state):
-    width = env.width
-    cell_types = env.cell_types
+def make_feature_extractor(env_type: EnvironmentType):
+    types = list(env_type.type_probs.keys())
 
-    x = state % width
-    y = state // width
-    f_s = [cell_types[x, y]]
-    for i in range(3):
-        f_s.append(cell_types.get((x + i - 1, y + 1), 'wall'))
-    return FeatureStateHandler().feature2state(f_s)
+    def sensor_feature_extractor(env, state):
+        width = env.width
+        cell_types = env.cell_types
+
+        x = state % width
+        y = state // width
+        f_s = [cell_types[x, y]]
+        for i in range(3):
+            f_s.append(cell_types.get((x + i - 1, y + 1), 'wall'))
+        return FeatureStateHandler(types=types).feature2state(f_s)
+
+    return sensor_feature_extractor
 
 
 def grid_feature_extractor(env, state):

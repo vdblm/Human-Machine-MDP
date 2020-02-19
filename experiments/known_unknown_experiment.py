@@ -8,7 +8,7 @@ from agents.switching_agents import Agent, Optimal, Alg2, Greedy
 from agents.hum_mac_agent import NoisyDriverAgent, UniformDriverAgent
 from environments.episodic_mdp import GridMDP
 from environments.make_envs import make_cell_based_env, make_sensor_based_env, grid_feature_extractor, \
-    sensor_feature_extractor
+    make_feature_extractor
 from plot.plot_path import PlotPath, HUMAN_COLOR, MACHINE_COLOR
 import numpy as np
 
@@ -124,7 +124,7 @@ class SwitchingExperiment:
 class SensorBasedSwitchingExperiment(SwitchingExperiment):
     def __init__(self, env_type: EnvironmentType, machine_agent: NoisyDriverAgent, human_agent: NoisyDriverAgent):
         super().__init__(env_type, machine_agent, human_agent)
-        self.feat_ext = sensor_feature_extractor
+        self.feat_ext = make_feature_extractor(env_type=env_type)
 
         # for a sensor-based state space, switching policy is trained only over
         # the environment type not the grid environment

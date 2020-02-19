@@ -69,8 +69,8 @@ ENV1 = EnvironmentType(type_probs={'road': 0.4, 'grass': 0.3, 'stone': 0.3, 'car
 ENV2 = EnvironmentType(type_probs={'road': 0.4, 'grass': 0.3, 'stone': 0.3, 'car': 0},
                        mid_lane_type_probs={'road': 0.6, 'grass': 0, 'stone': 0, 'car': 0.4})
 
-ENV3 = EnvironmentType(type_probs={'road': 0.5, 'grass': 0.3, 'stone': 0, 'car': 0.2},
+ENV3 = EnvironmentType(type_probs={'road': 0.5, 'grass': 0.3, 'car': 0.2},
                        mid_lane_type_probs=None)
 
-ENV3_LIGHT_TRAFFIC = EnvironmentType(type_probs={'road': 0.7, 'grass': 0.2, 'stone': 0, 'car': 0.1},
+ENV3_LIGHT_TRAFFIC = EnvironmentType(type_probs={'road': 0.7, 'grass': 0.2, 'car': 0.1},
                                      mid_lane_type_probs=None)
