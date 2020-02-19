@@ -4,7 +4,7 @@ This code depends on the following packages:
 
  1. `numpy`
  2. `matplotlib`
- 3. `wand`
+ 
 ## Code structure
 
  - `agents/` contains the human/machine action policies and implementation of Algorithm 1, Algorithm 2, and the Greedy algorithm in the paper.
