@@ -26,7 +26,7 @@ class NoisyDriverAgent(Agent):
         # [left, straight, right]
         self.n_action = 3
 
-    def update_policy(self, env: EpisodicMDP, sensor_based, type_costs=TYPE_COSTS):
+    def update_policy(self, env: EpisodicMDP, sensor_based, type_costs=TYPE_COSTS, env_types=None):
 
         if not sensor_based:
             assert isinstance(env, GridMDP), 'invalid environment class'
@@ -44,7 +44,13 @@ class NoisyDriverAgent(Agent):
                 types = [env.cell_types.get((x + a - 1, y + 1)) for a in range(self.n_action)]
             else:
                 type_costs['wall'] = np.nan
-                f_s = FeatureStateHandler().state2feature(s)
+
+                # TODO better handle this
+                if env_types is None:
+                    feature_hdnlr = FeatureStateHandler()
+                else:
+                    feature_hdnlr = FeatureStateHandler(env_types)
+                f_s = feature_hdnlr.state2feature(s)
                 types = [f_s[i] for i in range(1, 4)]
 
             noisy_actions = []
@@ -89,7 +95,7 @@ class NoisyDriverAgent(Agent):
 
 
 class UniformDriverAgent(Agent):
-    def __init__(self, env: EpisodicMDP, sensor_based, type_costs=TYPE_COSTS):
+    def __init__(self, env: EpisodicMDP, sensor_based, type_costs=TYPE_COSTS, env_types=None):
         """
         A uniform driver, which chooses the next cell uniformly at random.
         """
@@ -111,7 +117,12 @@ class UniformDriverAgent(Agent):
                 types = [env.cell_types.get((x + a - 1, y + 1)) for a in range(self.n_action)]
             else:
                 type_costs['wall'] = np.nan
-                f_s = FeatureStateHandler().state2feature(s)
+                # TODO better handle this
+                if env_types is None:
+                    feature_hdnlr = FeatureStateHandler()
+                else:
+                    feature_hdnlr = FeatureStateHandler(env_types)
+                f_s = feature_hdnlr.state2feature(s)
                 types = [f_s[i] for i in range(1, 4)]
 
             next_cells = [type_costs[t] for t in types]

@@ -131,8 +131,8 @@ class SensorBasedSwitchingExperiment(SwitchingExperiment):
         self.train_env = make_sensor_based_env(self.env_type)
 
         # update agents' action policies
-        self.agent0.update_policy(self.train_env, sensor_based=True)
-        self.agent1.update_policy(self.train_env, sensor_based=True)
+        self.agent0.update_policy(self.train_env, sensor_based=True, env_types=list(env_type.type_probs.keys()))
+        self.agent1.update_policy(self.train_env, sensor_based=True, env_types=list(env_type.type_probs.keys()))
 
         # uniform agent
         self.uniform_agent = UniformDriverAgent(self.train_env, sensor_based=True)

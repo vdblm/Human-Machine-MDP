@@ -63,7 +63,7 @@ class EnvironmentType:
 
 
 # default environment types
-ENV1 = EnvironmentType(type_probs={'road': 0.4, 'grass': 0.3, 'stone': 0.3, 'car': 0},
+ENV1 = EnvironmentType(type_probs={'road': 0.4, 'grass': 0.3, 'stone': 0.3},
                        mid_lane_type_probs={'road': 1, 'grass': 0, 'stone': 0, 'car': 0})
 
 ENV2 = EnvironmentType(type_probs={'road': 0.4, 'grass': 0.3, 'stone': 0.3, 'car': 0},
