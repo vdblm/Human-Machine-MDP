@@ -5,3 +5,6 @@ output/*
 outputs/*
 
 notes
+
+# Jupyter Notebook
+.ipynb_checkpoints
