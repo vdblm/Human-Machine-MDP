@@ -1,6 +1,8 @@
 """
 Implementation of the human/machine policies in the paper
 """
+import random
+
 from agents.switching_agents import Agent
 import numpy as np
 
@@ -30,9 +32,8 @@ class NoisyDriverAgent(Agent):
 
         if not sensor_based:
             assert isinstance(env, GridMDP), 'invalid environment class'
-
+        self.policy = np.ones((env.n_state, self.n_action))
         for s in range(env.n_state):
-            self.policy[s] = np.zeros(self.n_action)
             if not sensor_based:
                 type_costs[None] = np.nan
                 x = s % env.width
@@ -91,7 +92,7 @@ class NoisyDriverAgent(Agent):
             self.policy[s] /= np.sum(self.policy[s])
 
     def take_action(self, curr_state):
-        return np.random.choice(range(self.n_action), p=self.policy[curr_state])
+        return random.choices(range(self.n_action), self.policy[curr_state])[0]
 
 
 class UniformDriverAgent(Agent):
@@ -104,8 +105,8 @@ class UniformDriverAgent(Agent):
             assert isinstance(env, GridMDP), 'invalid environment class'
 
         self.n_action = 3
+        self.policy = np.zeros((env.n_state, self.n_action))
         for s in range(env.n_state):
-            self.policy[s] = np.zeros(self.n_action)
             if not sensor_based:
                 type_costs[None] = np.nan
                 x = s % env.width
@@ -136,4 +137,4 @@ class UniformDriverAgent(Agent):
             self.policy[s] /= np.sum(self.policy[s])
 
     def take_action(self, curr_state):
-        return np.random.choice(range(self.n_action), p=self.policy[curr_state])
+        return random.choices(range(self.n_action), self.policy[curr_state])[0]
