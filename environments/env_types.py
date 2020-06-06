@@ -1,3 +1,4 @@
+import random
 import numpy as np
 
 
@@ -56,9 +57,9 @@ class EnvironmentType:
         for x in range(width):
             for y in range(height):
                 if self.mid_lane_type_probs is not None and __in_middle(cell=(x, y)):
-                    cell_types[x, y] = np.random.choice(mid_types, p=mid_probs)
+                    cell_types[x, y] = random.choices(mid_types, mid_probs)[0]
                 else:
-                    cell_types[x, y] = np.random.choice(types, p=probs)
+                    cell_types[x, y] = random.choices(types, probs)[0]
         return cell_types
 
 

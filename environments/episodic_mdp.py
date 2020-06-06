@@ -1,11 +1,13 @@
 """
 An episodic RL MDP, including states, actions, costs, transition probabilities, and episode length.
 """
+import random
+
 import numpy as np
 
 
 class EpisodicMDP:
-    def __init__(self, n_state, n_action, ep_l, costs: dict, trans_probs: dict, start_state=0):
+    def __init__(self, n_state, n_action, ep_l, costs: np.ndarray, trans_probs: np.ndarray, start_state=0):
         """
         Parameters
         ----------
@@ -15,10 +17,10 @@ class EpisodicMDP:
             Number of actions
         ep_l : int
             Episode length
-        costs : dict
+        costs : np.ndarray
             State-action costs, i.e., {(state, action): costs}
 
-        trans_probs : dict
+        trans_probs : np.ndarray
             Transition probabilities, i.e., {(state, action): list of next state probabilities}
 
         start_state : int
@@ -54,8 +56,8 @@ class EpisodicMDP:
         finished : bool
             If time exceeds the episode length
         """
-        cost = self.costs[self.state, action]
-        self.state = np.random.choice(self.n_state, p=self.trans_probs[self.state, action])
+        cost = self.costs[self.state][action]
+        self.state = random.choices(range(self.n_state), self.trans_probs[self.state][action])[0]
 
         self.time_step += 1
         if self.time_step >= self.ep_l:
@@ -71,7 +73,7 @@ class GridMDP(EpisodicMDP):
     Grid episodic MDP with height, width, and cell types
     """
 
-    def __init__(self, n_state, n_action, ep_l, costs: dict, trans_probs: dict,
+    def __init__(self, n_state, n_action, ep_l, costs: np.ndarray, trans_probs: np.ndarray,
                  start_state, width, height, cell_types: dict):
         """
 

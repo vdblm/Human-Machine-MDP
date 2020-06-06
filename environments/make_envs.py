@@ -68,7 +68,7 @@ class FeatureStateHandler:
         values = [self.type_value[g] for g in feature_vec]
         state_num = 0
         for i, value in enumerate(values):
-            state_num += value * np.power(self.base, len(values) - i - 1)
+            state_num += value * (self.base ** (len(values) - i - 1))
         return state_num
 
     def state2feature(self, state: int):
@@ -96,6 +96,7 @@ class FeatureStateHandler:
 
 def make_feature_extractor(env_type: EnvironmentType):
     types = list(env_type.type_probs.keys())
+    feat2state = FeatureStateHandler(types=types).feature2state
 
     def sensor_feature_extractor(env, state):
         width = env.width
@@ -104,9 +105,8 @@ def make_feature_extractor(env_type: EnvironmentType):
         x = state % width
         y = state // width
         f_s = [cell_types[x, y]]
-        for i in range(3):
-            f_s.append(cell_types.get((x + i - 1, y + 1), 'wall'))
-        return FeatureStateHandler(types=types).feature2state(f_s)
+        f_s.extend([cell_types.get((x + i - 1, y + 1), 'wall') for i in range(3)])
+        return feat2state(f_s)
 
     return sensor_feature_extractor
 
@@ -143,11 +143,11 @@ def make_cell_based_env(env_type: EnvironmentType, width: int = WIDTH, height: i
     ep_l = height - 1
 
     if start_cell is None:
-        start_cell = (np.floor((width - 1) / 2), 0)
+        start_cell = ((width - 1) // 2, 0)
 
     # true costs and transitions
-    true_costs = {}
-    true_transitions = {}
+    true_costs = np.zeros(shape=(n_state, n_action))
+    true_transitions = np.zeros(shape=(n_state, n_action, n_state))
 
     # generate cell types
     cell_types = env_type.generate_cell_types(width, height)
@@ -160,11 +160,10 @@ def make_cell_based_env(env_type: EnvironmentType, width: int = WIDTH, height: i
             # costs
             cost = type_costs[cell_types[x, y]]
             for action in range(n_action):
-                true_costs[state, action] = cost
+                true_costs[state][action] = cost
 
             # transitions
             for action in range(n_action):
-                true_transitions[state, action] = np.zeros(n_state, dtype=np.float)
 
                 # the new cell after taking 'action'
                 x_n, y_n = x + action - 1, y + 1
@@ -182,11 +181,11 @@ def make_cell_based_env(env_type: EnvironmentType, width: int = WIDTH, height: i
                     elif x_n >= width:
                         s_n1 = y_n * width + width - 1
                         s_n2 = y_n * width + width - 2
-                    true_transitions[state, action][s_n1] = 0.5
-                    true_transitions[state, action][s_n2] = 0.5
+                    true_transitions[state][action][s_n1] = 0.5
+                    true_transitions[state][action][s_n2] = 0.5
                 else:
                     s_n = y_n * width + x_n
-                    true_transitions[state, action][s_n] = 1
+                    true_transitions[state][action][s_n] = 1
 
     start_state = start_cell[0] + start_cell[1] * width
 
@@ -265,15 +264,14 @@ def make_sensor_based_env(env_type: EnvironmentType, ep_l: int = EP_L, type_cost
     n_state = f_s_handler.n_state
 
     # true costs and transitions
-    true_transitions = {}
-    true_costs = {}
+    true_costs = np.zeros(shape=(n_state, n_action))
+    true_transitions = np.zeros(shape=(n_state, n_action, n_state))
 
     for state in range(n_state):
         for action in range(n_action):
             feat_vec = f_s_handler.state2feature(state)
 
-            true_costs[state, action] = type_costs[feat_vec[0]]
-            true_transitions[state, action] = np.zeros(n_state, dtype=np.float)
+            true_costs[state][action] = type_costs[feat_vec[0]]
 
             for nxt_state in range(n_state):
                 nxt_feat_vec = f_s_handler.state2feature(nxt_state)
@@ -287,11 +285,11 @@ def make_sensor_based_env(env_type: EnvironmentType, ep_l: int = EP_L, type_cost
                 else:
                     a1, a2 = action, action
 
-                true_transitions[state, action][nxt_state] = 0.5 * (__calc_prob(feat_vec, nxt_feat_vec, a1) +
+                true_transitions[state][action][nxt_state] = 0.5 * (__calc_prob(feat_vec, nxt_feat_vec, a1) +
                                                                     __calc_prob(feat_vec, nxt_feat_vec, a2))
 
             # Normalize
-            true_transitions[state, action] = true_transitions[state, action] / sum(true_transitions[state, action])
+            true_transitions[state][action] = true_transitions[state][action] / sum(true_transitions[state][action])
 
     env = EpisodicMDP(n_state, n_action, ep_l, true_costs, true_transitions, start_state=0)
     return env
