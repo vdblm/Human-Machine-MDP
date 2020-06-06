@@ -1,7 +1,9 @@
 from collections import defaultdict
 import os
 import numpy as np
-import pylab as pl
+
+from matplotlib import pyplot as pl
+from PIL import Image
 from matplotlib import collections as mc
 from environments.episodic_mdp import GridMDP
 
@@ -73,8 +75,11 @@ class PlotPath:
         lines = []
         colors = []
         widths = []
+        x_ratio = 0.5
+        y_ratio = self.width / self.height
         for line_tuple, count in self.lines.items():
-            line = [(line_tuple[0] + 0.5, line_tuple[1] + 0.5), (line_tuple[2] + 0.5, line_tuple[3] + 0.5)]
+            line = [((line_tuple[0] + 0.5) * x_ratio, (line_tuple[1] + 0.5) * y_ratio),
+                    ((line_tuple[2] + 0.5) * x_ratio, (line_tuple[3] + 0.5) * y_ratio)]
             lines.append(line)
             colors.append(line_tuple[4])
             widths.append(count)
@@ -83,35 +88,32 @@ class PlotPath:
         lc = mc.LineCollection(lines, colors=colors, linewidths=widths)
 
         fig, ax = pl.subplots()
-        # add images
-        for x in range(self.width):
-            for y in range(self.height):
-                cell_type = str(self.cell_types[x, y])
-                # TODO only 'png'?
-                img = pl.imread(self.img_dir + cell_type + '.png')
-                ax.imshow(img, extent=[x, x + 1, y, y + 1])
-
-        ax.add_collection(lc)
-        ax.autoscale()
-        pl.grid(True, linewidth=0.2, color='black')
-        ax.set_xticks([])
-        ax.set_yticks([])
-
         # add grid lines
         ratio = 10
         x = np.linspace(0, self.width, self.width * ratio)
         for y in range(self.height):
-            ax.plot(x, [y for i in range(self.width * ratio)], color='gray', linewidth=0.2)
+            ax.plot(x * x_ratio, [y * y_ratio for i in range(self.width * ratio)], color='black', linewidth=0.8)
 
         y = np.linspace(0, self.height, self.height * ratio)
         for x in range(self.width):
-            ax.plot([x for i in range(self.height * ratio)], y, color='gray', linewidth=0.2)
+            ax.plot([x * x_ratio for i in range(self.height * ratio)], y * y_ratio, color='black', linewidth=0.8)
+
+        # add images
+        for x in range(self.width):
+            for y in range(self.height):
+                cell_type = str(self.cell_types[x, y])
+                img = Image.open(self.img_dir + cell_type + '.png')
+                ax.imshow(img, extent=[x * x_ratio, (x + 1) * x_ratio, y * y_ratio, (y + 1) * y_ratio])
+
+        ax.add_collection(lc)
+        pl.grid(True, linewidth=1, color='gray')
+        ax.set_xticks([])
+        ax.set_yticks([])
 
         # plot
-        fig.tight_layout()
-        # TODO only png?
-        fig.savefig(OUTPUT_DIR + file_name + '.png', bbox_inches='tight', pad_inches=0)
+        fig.savefig(OUTPUT_DIR + file_name, format='png', dpi=200, bbox_inches='tight', pad_inches=0.01)
         pl.close()
 
         # clear `self.lines`
         self.lines = defaultdict(int)
+
