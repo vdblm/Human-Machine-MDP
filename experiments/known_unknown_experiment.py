@@ -4,7 +4,7 @@ Implementation of the known and unknown human experiments in the paper
 import os
 
 from environments.env_types import EnvironmentType
-from agents.switching_agents import Agent, Optimal, Alg2, Greedy
+from agents.switching_agents import Agent, Optimal, Alg2, Greedy, UCRL2
 from agents.hum_mac_agent import NoisyDriverAgent, UniformDriverAgent
 from environments.episodic_mdp import GridMDP
 from environments.make_envs import make_cell_based_env, make_sensor_based_env, grid_feature_extractor, \
@@ -33,7 +33,7 @@ class SwitchingExperiment:
         Parameters
         ----------
         is_learn : bool
-            Indicates if we are learning or evaluating. If `is_learn == True`,
+            Indicates if we are training or evaluating. If `is_learn == True`,
             then `n_try = 1`, and we will update the observations of `switching_agent`
 
         Returns
@@ -55,7 +55,7 @@ class SwitchingExperiment:
         for i in range(n_try):
             finished = False
             env.reset()
-            d_t = -1
+            d_t = 0
             s_tplus1 = env.start_state
             while not finished:
                 count += 1
@@ -70,7 +70,8 @@ class SwitchingExperiment:
                     human_control += 1
 
                 s_tplus1, env_cost, finished = env.step_forward(action)
-                is_switch = 1 if d_t != d_tminus1 and d_tminus1 != -1 else 0
+                # TODO check env.time_step
+                is_switch = 1 if d_t != d_tminus1 and env.time_step > 0 else 0
                 switch_number += is_switch
                 cost = env_cost + switching_cost * is_switch + agent1_cost * d_t + agent0_cost * (1 - d_t)
                 total_costs += cost
@@ -146,7 +147,7 @@ class SensorBasedSwitchingExperiment(SwitchingExperiment):
         # find the optimal switching policy
         optimal_switching_agent = Optimal(env=self.train_env, agent0=self.agent0, agent1=self.agent1,
                                           switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost)
-        optimal_switching_agent.update_policy()
+        optimal_switching_agent.update_policy(0)
 
         # evaluate and plot
         plt_path = PlotPath(env, n_try)
@@ -165,7 +166,7 @@ class SensorBasedSwitchingExperiment(SwitchingExperiment):
         """
         Run the unknown human experiment in the paper. In each episode,
         it generates a new grid environment and runs the optimal algorithm (algorithm 1),
-        algorithm 2, and greedy algorithm to find the switching policy. To train the
+        algorithm 2, UCRL2, and greedy algorithm to find the switching policy. To train the
         switching agents, we only run once in an episode. However, the evaluation is done
         by repeating the experiment `n_try` times in each episode (We don't train during evaluation).
 
@@ -192,6 +193,8 @@ class SensorBasedSwitchingExperiment(SwitchingExperiment):
             `alg2_regret[i]` = expected cost of algorithm 2 - optimal expected cost in episode 'i'
         greedy_regret : list
             A list containing the regret of the greedy algorithm in each episode
+        ucrl2_regret : list
+            A list containing the regret of UCRL2 algorithm in each episode
         """
 
         if plot_epochs is None:
@@ -199,28 +202,32 @@ class SensorBasedSwitchingExperiment(SwitchingExperiment):
 
         optimal_switching_agent = Optimal(env=self.train_env, agent0=self.agent0, agent1=self.agent1,
                                           switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost)
-        optimal_switching_agent.update_policy()
+        optimal_switching_agent.update_policy(0)
 
         """
-        Note that both Alg2 and Greedy switching agents don't have access to the true human policy. 
+        Note that Alg2, UCRL2, and Greedy switching agents don't have access to the true human policy. 
         Instead, they begin with a uniform action policy.
         """
         # the unknown agent is human (agent1)
         alg2_switching_agent = Alg2(env=self.train_env, agent0=self.agent0, agent1=self.uniform_agent,
                                     switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost, delta=0.1,
-                                    unknown_agent=1)
+                                    unknown_agent=1, scale=0.05)
 
         greedy_switching_agent = Greedy(env=self.train_env, agent0=self.agent0, agent1=self.uniform_agent,
                                         switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost, delta=0.1,
                                         unknown_agent=1)
+        ucrl2_switch_agent = UCRL2(env=self.train_env, agent0=self.agent0, agent1=self.uniform_agent,
+                                   switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost, delta=0.1,
+                                   unknown_agent=1, scale=0.0005)
 
         alg2_regret = []
         greedy_regret = []
+        ucrl2_regret = []
 
         for ep in range(n_episode):
             alg2_switching_agent.update_policy(ep)
             greedy_switching_agent.update_policy(ep)
-
+            ucrl2_switch_agent.update_policy(ep)
             # initialize a new grid env for this episode
             grid_env = make_cell_based_env(self.env_type)
 
@@ -236,7 +243,7 @@ class SensorBasedSwitchingExperiment(SwitchingExperiment):
                 plt_path = PlotPath(grid_env, n_try)
             else:
                 plt_path = None
-            # evaluate algorithm2 and greedy algorithm
+            # evaluate algorithm2, ucrl2, and greedy algorithm
             alg2_result = self.learn_evaluate(is_learn=False, env=grid_env, switching_agent=alg2_switching_agent,
                                               switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
                                               n_try=n_try, plt_path=plt_path)
@@ -244,17 +251,25 @@ class SensorBasedSwitchingExperiment(SwitchingExperiment):
             greedy_result = self.learn_evaluate(is_learn=False, env=grid_env, switching_agent=greedy_switching_agent,
                                                 switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
                                                 n_try=n_try)
+            ucrl2_result = self.learn_evaluate(is_learn=False, env=grid_env, switching_agent=ucrl2_switch_agent,
+                                               switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
+                                               n_try=n_try)
 
             alg2_regret.append(alg2_result['exp_cost'] - optimal_value)
             greedy_regret.append(greedy_result['exp_cost'] - optimal_value)
+            ucrl2_regret.append(ucrl2_result['exp_cost'] - optimal_value)
 
             if plt_path is not None:
                 plot_name = 'ep_{}'.format(ep)
                 plot_file = os.path.join(plot_dir, plot_name)
                 plt_path.plot(plot_file)
 
-            # learn algorithm2 and greedy algorithm
+            # train algorithm2, ucrl2, and greedy algorithm
             self.learn_evaluate(is_learn=True, env=grid_env, switching_agent=alg2_switching_agent,
+                                switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
+                                n_try=1)
+
+            self.learn_evaluate(is_learn=True, env=grid_env, switching_agent=ucrl2_switch_agent,
                                 switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost,
                                 n_try=1)
             self.learn_evaluate(is_learn=True, env=grid_env, switching_agent=greedy_switching_agent,
@@ -264,9 +279,11 @@ class SensorBasedSwitchingExperiment(SwitchingExperiment):
                 print("################### Episode {} ###################".format(ep))
                 print('algorithm 2 cumulative regret: {}'.format(np.sum(alg2_regret)))
                 print('greedy algorithm cumulative regret: {}'.format(np.sum(greedy_regret)))
+                print('UCRL2 algorithm cumulative regret: {}'.format(np.sum(ucrl2_regret)))
+
             grid_env.reset()
 
-        return alg2_regret, greedy_regret
+        return alg2_regret, greedy_regret, ucrl2_regret
 
 
 class CellBasedSwitchingExperiment(SwitchingExperiment):
@@ -287,7 +304,7 @@ class CellBasedSwitchingExperiment(SwitchingExperiment):
         # find the optimal switching policy
         optimal_switching_agent = Optimal(env=env, agent0=self.agent0, agent1=self.agent1,
                                           switching_cost=switching_cost, agent0_cost=0, agent1_cost=human_cost)
-        optimal_switching_agent.update_policy()
+        optimal_switching_agent.update_policy(0)
 
         # evaluate and plot
         plt_path = PlotPath(env, n_try)
