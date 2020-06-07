@@ -32,7 +32,7 @@ class NoisyDriverAgent(Agent):
 
         if not sensor_based:
             assert isinstance(env, GridMDP), 'invalid environment class'
-        self.policy = np.ones((env.n_state, self.n_action))
+        self.policy = np.zeros((env.n_state, self.n_action))
         for s in range(env.n_state):
             if not sensor_based:
                 type_costs[None] = np.nan
